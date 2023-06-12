@@ -1,0 +1,17 @@
+{
+  "train":{
+    "tags": ["gptj", "ppoepoch1","steps40000"],
+    "checkpoint_dir": "/root/trlx_ckps/gptj-ppoepoch1-steps40000",
+    "total_steps": 40000,
+    "epochs":40000
+  },
+  "scheduler":{
+    "kwargs":{
+        "T_max": 40000
+    }
+  },
+  "method":{
+    "ppo_epochs":1
+  }
+
+}

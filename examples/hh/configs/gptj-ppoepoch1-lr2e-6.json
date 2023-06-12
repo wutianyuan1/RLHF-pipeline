@@ -1,0 +1,20 @@
+{
+  "train":{
+    "tags": ["gptj", "ppoepoch1","lr2e-6"],
+    "checkpoint_dir": "/root/trlx_ckps/gptj-ppoepoch1-lr2e-6"
+  },
+  "method":{
+    "ppo_epochs":1
+  },
+  "optimizer":{
+    "kwargs":{
+      "lr":2e-6
+    }
+  },
+  "scheduler":{
+    "kwargs":{
+      "eta_min": 2e-6
+    }
+  }
+
+}

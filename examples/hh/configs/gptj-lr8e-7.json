@@ -1,0 +1,16 @@
+{
+  "train":{
+    "tags": ["gptj", "lr8e-7"],
+    "checkpoint_dir": "/root/trlx_ckps/gptj-lr8e-7"
+  },
+  "optimizer":{
+    "kwargs":{
+      "lr":8e-7
+    }
+  },
+  "scheduler":{
+    "kwargs":{
+      "eta_min": 8e-7
+    }
+  }
+}

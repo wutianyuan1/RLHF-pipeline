@@ -1,0 +1,16 @@
+{
+  "train":{
+    "tags": ["gptj","bugfix-ppo_loop","lr2e-6"],
+    "checkpoint_dir": "/root/trlx_ckps/gptj-bugfix-ppo_loop-lr2e-6"
+  },
+  "optimizer":{
+    "kwargs":{
+      "lr":2e-6
+    }
+  },
+  "scheduler":{
+    "kwargs":{
+      "eta_min": 2e-6
+    }
+  }
+}

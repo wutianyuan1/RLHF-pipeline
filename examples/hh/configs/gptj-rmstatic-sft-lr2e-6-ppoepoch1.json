@@ -1,0 +1,22 @@
+{
+  "train":{
+    "tags": ["gptj", "sft-static","ppoepoch1","lr2e-6"],
+    "checkpoint_dir": "/root/trlx_ckps/gptj-sft-static-ppoepoch1-lr2e-6"
+  },
+  "model":{
+    "model_path":"Dahoas/gptj-sft-static"
+  },
+  "optimizer":{
+    "kwargs":{
+      "lr":2e-6
+    }
+  },
+  "scheduler":{
+    "kwargs":{
+        "eta_min":2e-6
+    }
+  },
+  "method":{
+    "ppo_epochs":1
+  }
+}

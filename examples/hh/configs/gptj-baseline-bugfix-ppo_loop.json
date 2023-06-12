@@ -1,0 +1,6 @@
+{
+  "train":{
+    "tags": ["gptj", "baseline","bugfix-ppo_loop"],
+    "checkpoint_dir": "/root/trlx_ckps/gptj-baseline-bugfix-ppo_loop"
+  }
+}

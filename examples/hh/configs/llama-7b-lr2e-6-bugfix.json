@@ -1,0 +1,22 @@
+{
+  "train":{
+    "tags": ["llama-7b", "lr2e-6","bugfix"],
+    "checkpoint_dir": "/root/trlx_ckps/llama-7b-lr2e-6-bugfix"
+  },
+  "model":{
+    "model_path":"/root/model_weights/llama-hf-7b"
+  },
+  "tokenizer":{
+    "tokenizer_path":"/root/model_weights/llama-hf-7b"
+  },
+  "optimizer":{
+    "kwargs":{
+      "lr":2e-6
+    }
+  },
+  "scheduler":{
+    "kwargs":{
+        "eta_min":2e-6
+    }
+  }
+}

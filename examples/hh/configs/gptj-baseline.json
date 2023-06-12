@@ -1,0 +1,6 @@
+{
+  "train":{
+    "tags": ["gptj", "baseline"],
+    "checkpoint_dir": "/root/trlx_ckps/gptj-baseline"
+  }
+}

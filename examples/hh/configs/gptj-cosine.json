@@ -1,0 +1,11 @@
+{
+  "train":{
+    "tags": ["gptj", "cosine"],
+    "checkpoint_dir": "/root/trlx_ckps/gptj-cosine"
+  },
+  "scheduler":{
+    "kwargs":{
+      "eta_min": 8e-7
+    }
+  }
+}

@@ -1,0 +1,25 @@
+{
+  "train":{
+    "tags": ["vicuna-7b", "lr8e-7","ppoepoch1"],
+    "checkpoint_dir": "/root/trlx_ckps/vicuna-7b-lr8e-7-ppoepoch1"
+  },
+  "model":{
+    "model_path":"/root/model_weights/vicuna-7b-v1.1"
+  },
+  "tokenizer":{
+    "tokenizer_path":"/root/model_weights/vicuna-7b-v1.1"
+  },
+  "optimizer":{
+    "kwargs":{
+      "lr":8e-7
+    }
+  },
+  "scheduler":{
+    "kwargs":{
+        "eta_min":8e-7
+    }
+  },
+  "method":{
+    "ppo_epochs":1
+  }
+}

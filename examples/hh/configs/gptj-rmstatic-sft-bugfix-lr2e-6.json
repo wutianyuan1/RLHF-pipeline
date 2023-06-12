@@ -1,0 +1,19 @@
+{
+  "train":{
+    "tags": ["gptj", "sft-static","bugfix","lr2e-6"],
+    "checkpoint_dir": "/root/trlx_ckps/gptj-sft-static-bugfix-lr2e-6"
+  },
+  "model":{
+    "model_path":"Dahoas/gptj-sft-static"
+  },
+  "optimizer":{
+    "kwargs":{
+      "lr":2e-6
+    }
+  },
+  "scheduler":{
+    "kwargs":{
+        "eta_min":2e-6
+    }
+  }
+}

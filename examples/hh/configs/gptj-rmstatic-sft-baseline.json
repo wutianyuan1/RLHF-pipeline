@@ -1,0 +1,9 @@
+{
+  "train":{
+    "tags": ["gptj", "sft-static","baseline"],
+    "checkpoint_dir": "/root/trlx_ckps/gptj-sft-static-baseline"
+  },
+  "model":{
+    "model_path":"Dahoas/gptj-sft-static"
+  }
+}
