@@ -1,7 +1,7 @@
 {
   "train":{
     "tags": ["gptj","bugfix-ppo_loop","lr2e-6","ppoepoch1"],
-    "checkpoint_dir": "/home/ziyyang/v-wutianyuan/GPT-RLHF/chkpts/"
+    "checkpoint_dir": "/home/ziyyang/v-wutianyuan/RLHF-new/chkpts/"
   },
   "optimizer":{
     "kwargs":{

@@ -36,7 +36,6 @@ def profile_stop():
 
 default_config = TRLConfig(
     train=TrainConfig(
-        tracker=None,
         seq_length=1024,
         epochs=10000,
         total_steps=10000,
@@ -98,7 +97,7 @@ elif config_name == "1B":
 elif config_name == "6B":
     default_config.train.batch_size = 4
     default_config.train.seq_length = 512
-    default_config.train.total_steps = 256
+    default_config.train.total_steps = 6000
     default_config.train.checkpoint_dir = "checkpoints/ppo_hh_6B"
     default_config.model.model_path = "Dahoas/pythia-6B-static-sft"
     default_config.tokenizer.tokenizer_path = "EleutherAI/gpt-neox-20b"
