@@ -262,9 +262,13 @@ class AccelerateRLTrainer(BaseRLTrainer):
             kwargs = dict(self.generate_kwargs, **kwargs)
 
         with torch.no_grad():
-            return self.accelerator.unwrap_model(self.model).generate(
+            t0 = time()
+            ret = self.accelerator.unwrap_model(self.model).generate(
                 input_ids=input_ids, attention_mask=attention_mask, **kwargs
             )
+            t1 = time()
+            print(f'RANK {os.environ.get("RANK", "0")}: !!!!generate time {t1 - t0}')
+            return ret
 
     def generate_eval(self, input_ids, attention_mask=None, **kwargs):
         """Wraps hf's `generate` adding some specific method's defaults"""

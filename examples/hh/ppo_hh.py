@@ -36,6 +36,7 @@ def profile_stop():
 
 default_config = TRLConfig(
     train=TrainConfig(
+        tracker=None,
         seq_length=1024,
         epochs=10000,
         total_steps=10000,
@@ -43,6 +44,7 @@ default_config = TRLConfig(
         checkpoint_interval=1000,
         eval_interval=500,
         pipeline="PromptPipeline",
+        # trainer="PipelinedPPOTrainer",
         trainer="AcceleratePPOTrainer",
         checkpoint_dir="checkpoints/ppo_hh",
     ),
