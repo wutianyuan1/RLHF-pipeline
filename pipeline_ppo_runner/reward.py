@@ -5,9 +5,11 @@ import os
 import numpy as np
 
 from torch import nn
+from time import time
 from huggingface_hub import snapshot_download
 from transformers import AutoModelForCausalLM, AutoTokenizer
 from pipeline.shmqueue import ShmQueue
+from multiprocessing.shared_memory import SharedMemory
 
 
 class RewardModel(nn.Module):
@@ -74,17 +76,24 @@ class RewardProcess(multiprocessing.Process):
         return rewards - original_rewards
     
     def run(self):
+        logfile = open('rewproc.log', 'w')
         while True:
             try:
+                print("waiting for data...", file=logfile, flush=True)
                 in_data = self.in_queue.get()
-                samples = torch.tensor(in_data['samples'], device=self.reward_device)
-                prompts = torch.tensor(in_data['prompts'], device=self.reward_device)
-                original_output = torch.tensor(in_data['original_output'], device=self.reward_device)
-                rewards = self.get_reward(samples, prompts, original_output)
+                s_t = time()
+                print("recv time:", s_t, file=logfile, flush=True)
+                print("get data:", in_data, file=logfile, flush=True)
+                samples = in_data['samples']
+                prompts = in_data['prompts']
+                original_output = in_data['original_output']
+                rewards = self.reward_fn(samples, prompts, original_output)
+                print("reward:", rewards, rewards.shape, file=logfile, flush=True)
                 out_data = {
-                    "samples": in_data['samples'],
                     "rewards": rewards.detach().cpu().numpy(),
                 }
+                e_t = time()
+                print("reward calculation time:", e_t - s_t, file=logfile, flush=True)
                 self.out_queue.put(out_data)
             except KeyboardInterrupt:
                 break
@@ -114,17 +123,19 @@ def create_reward_fn():  # noqa:  C901
         delta_reward = True
 
         multiprocessing.set_start_method('spawn', force=True)
+        total_items = 7 * 16  # nprocs * batch_size
         in_specs = {
-            "samples": np.zeros(),
-            "prompts": np.zeros(),
-            "original_output": np.zeros(),
+            "samples": np.array(['a' for _ in range(total_items)], dtype='U5000'),
+            "prompts": np.array(['a' for _ in range(total_items)], dtype='U5000'),
+            "original_output": np.array(['a' for _ in range(total_items)], dtype='U5000'),
         }
         out_specs = {
-            "samples": np.zeros(),
-            "rewards": np.zeros(),
+            "rewards": np.zeros((16 * 7,), dtype=np.float16),
         }
-        in_queue = ShmQueue(10, 100 * 2**20, in_specs)
-        out_queue = ShmQueue(10, 100 * 2**20, out_specs)
+        in_shm = SharedMemory("in_shm", create=True, size=100 * 2**20)
+        in_queue = ShmQueue(10, in_shm, in_specs)
+        out_shm = SharedMemory("out_shm", create=True, size=100 * 2**20)
+        out_queue = ShmQueue(10, out_shm, out_specs)
 
         reward_process = RewardProcess(
             reward_model, reward_tokenizer, reward_device, reward_batch_size,

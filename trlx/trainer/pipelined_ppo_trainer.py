@@ -1,20 +1,18 @@
-import json
 import os
-import uuid
-from time import time
-from typing import Callable, List
-
 import torch
 import torch.nn.functional as F
-
+import numpy as np
 import trlx.utils.logging as logging
+
+from time import time
 from trlx.data.accelerate_base_datatypes import PromptBatch
 from trlx.data.configs import TRLConfig
 from trlx.data.ppo_types import PPORLElement
 from trlx.trainer import register_trainer
 from trlx.trainer.accelerate_ppo_trainer import AcceleratePPOTrainer
 from trlx.utils import Clock
-from trlx.utils.modeling import gather_dict, logprobs_of_labels
+from trlx.utils.modeling import logprobs_of_labels
+
 
 logger = logging.get_logger(__name__)
 
@@ -50,26 +48,30 @@ class PipelinedPPOTrainer(AcceleratePPOTrainer):
         gathered_prompt_sizes = self.accelerator.gather(prompt_sizes)
 
         if self.accelerator.is_main_process:
+            print("shape:", gathered_prompts.shape, gathered_samples.shape, gathered_prompt_sizes.shape,
+                  "device:", gathered_prompts.device, gathered_samples.device, gathered_prompt_sizes.device)
             all_str_samples, all_str_prompts, all_str_outputs = self.decode(
                 gathered_prompts, gathered_samples, gathered_prompt_sizes, append_eos_token=True
             )
             send_data = {
-                "samples": all_str_samples,
-                "prompts": all_str_prompts,
-                "original_output": all_str_outputs,
+                "samples": np.array(all_str_samples, dtype='U5000'),
+                "prompts": np.array(all_str_prompts, dtype='U5000'),
+                "original_output": np.array(all_str_outputs, dtype='U5000'),
             }
+            print("send time:", time())
             self.in_queue.put(send_data)
-        ## TODO: push into queue
         return samples
 
-    def make_experience_postprocess(self, samples, stats, start_clock):
+    def make_experience_postprocess(self, prompt_tensors, samples, stats, start_clock):
         assert self.config.model.model_arch_type != "seq2seq"
 
         device = samples.device
 
         if self.accelerator.is_main_process:
             all_scores = self.out_queue.get()
-            all_scores = torch.tensor(all_scores['reward'], device=self.accelerator.device)
+            print("get all scores:", all_scores)
+            all_scores = torch.tensor(all_scores['rewards'], dtype=torch.float, device=self.accelerator.device)
+            print("process all scores:", all_scores)
             all_scores = list(all_scores.reshape(self.accelerator.num_processes, -1).unbind())
         else:
             all_scores = None
@@ -215,14 +217,17 @@ class PipelinedPPOTrainer(AcceleratePPOTrainer):
 
         all_iter_stats = []
         all_iter_samples = []
+        all_iter_prompts = []
         n_samples = 0
         while n_samples < num_rollouts:
+            print(n_samples, num_rollouts)
             stats = {}
             # Get next batch in prompt dataset
             batch: PromptBatch = next(self.prompt_iterator)
             ## TODO: fix device
             samples = self.make_experience_rollout(batch, stats)
 
+            all_iter_prompts.append(batch.input_ids)
             all_iter_stats.append(stats)
             all_iter_samples.append(samples)
             n_samples += samples.shape[0]
@@ -233,8 +238,10 @@ class PipelinedPPOTrainer(AcceleratePPOTrainer):
         while len(ppo_rl_elements) < num_rollouts:
             samples = all_iter_samples[cur_iter]
             stats = all_iter_stats[cur_iter]
+            prompt_tensors = all_iter_prompts[cur_iter]
             cur_iter_ppo_rl_elements, rollout_count =\
-                self.make_experience_postprocess(samples, stats, clock)
+                self.make_experience_postprocess(
+                samples, prompt_tensors, stats, clock)
 
             cur_iter += 1
             ppo_rl_elements += cur_iter_ppo_rl_elements
