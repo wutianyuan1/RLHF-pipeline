@@ -44,7 +44,6 @@ default_config = TRLConfig(
         checkpoint_interval=1000,
         eval_interval=500,
         pipeline="PromptPipeline",
-        # trainer="PipelinedPPOTrainer",
         trainer="AcceleratePPOTrainer",
         checkpoint_dir="checkpoints/ppo_hh",
     ),
