@@ -14,7 +14,6 @@ from trlx.data.default_configs import (
 def get_default_config():
     default_config = TRLConfig(
         train=TrainConfig(
-            tracker=None,
             seq_length=1024,
             epochs=10000,
             total_steps=10000,

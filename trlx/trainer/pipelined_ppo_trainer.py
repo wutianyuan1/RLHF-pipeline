@@ -74,8 +74,6 @@ class PipelinedPPOTrainer(AcceleratePPOTrainer):
         torch.distributed.scatter(scores, all_scores)
         
         cur_iter_ppo_rl_elements = []
-        torch.save(prompt_tensors, f'dump/pplrank{os.environ.get("RANK", "0")}_prompts.pt')
-        torch.save(samples, f'dump/pplrank{os.environ.get("RANK", "0")}_samples.pt')
         str_samples, str_prompts, str_outputs = self.decode(prompt_tensors, samples, append_eos_token=True)
         # Pad the sample outputs
         outputs = self.tokenizer(str_outputs).input_ids
