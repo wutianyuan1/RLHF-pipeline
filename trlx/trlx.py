@@ -125,7 +125,6 @@ def train(  # noqa: C901
 
     # Online training against a reward function (e.g. PPO)
     if reward_fn:
-        # print("!!->> reward fn")
         prompts = prompts or [trainer.tokenizer.bos_token] * batch_size
 
         if eval_prompts is None:
@@ -138,13 +137,10 @@ def train(  # noqa: C901
 
         if eval_prompts is None:
             eval_prompts = prompts[:batch_size]
-        print("!!!!make exper:", config.method.num_rollouts)
         trainer.make_experience(config.method.num_rollouts)
-        # print("!!!make exp done")
 
     # Offline training from the collected samples (e.g. SFT, ILQL)
     elif samples:
-        # print("!!->> samples")
         if rewards is not None:
             if len(samples) != len(rewards):
                 raise ValueError(f"Number of samples {len(samples)} should match the number of rewards {len(rewards)}")
@@ -163,7 +159,5 @@ def train(  # noqa: C901
         eval_prompts, max_prompt_length, trainer.tokenizer, add_special_tokens=config.model.model_arch_type == "seq2seq"
     )
     trainer.add_eval_pipeline(eval_pipeline)
-    # print("!!->> learn:", trainer)
-    # cuda_memory_summary()
     trainer.learn()
     return trainer

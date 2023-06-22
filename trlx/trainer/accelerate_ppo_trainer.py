@@ -282,20 +282,9 @@ class AcceleratePPOTrainer(AccelerateRLTrainer):
             batch: PromptBatch = next(self.prompt_iterator)
 
             rollout_generate_time = time()
-            # print(">>> rank:{}, input_id: {}, mask: {}, hash_of_input_id:{}, hash_of_mask: {}".format(
-            #         os.environ.get("RANK", "0"), hash(batch["input_ids"]),
-            #         batch["input_ids"].shape,
-            #         batch["attention_mask"].shape,
-            #         hash(batch["input_ids"].cpu()),
-            #         hash(batch["attention_mask"].cpu())
-            #     )
-            # )
             # Generate samples from the language model (similar to using HuggingFace `generate` method)
-            print(f'RANK {os.environ.get("RANK", "0")}: rollout: input_id shape={batch["input_ids"].shape}, mask_shape={batch["attention_mask"].shape}')
             samples = self.generate(batch["input_ids"], batch["attention_mask"])
-            t2 = time()
-            stats["time/rollout_generate"] = t2 - rollout_generate_time
-            print(f'RANK {os.environ.get("RANK", "0")}: rollout generate time = {stats["time/rollout_generate"]}')
+            stats["time/rollout_generate"] = time() - rollout_generate_time
 
             prompt_tensors = batch.input_ids
             device = samples.device
@@ -307,15 +296,11 @@ class AcceleratePPOTrainer(AccelerateRLTrainer):
             padded_prompts = self.accelerator.pad_across_processes(
                 prompt_tensors, dim=1, pad_index=self.tokenizer.eos_token_id, pad_first=False
             )
-            t3 = time()
-            print(f'RANK {os.environ.get("RANK", "0")}: before gather padding time = {t3 - t2}')
 
             gathered_samples = self.accelerator.gather(padded_samples)
             gathered_prompts = self.accelerator.gather(padded_prompts)
             gathered_prompt_sizes = self.accelerator.gather(prompt_sizes)
             metadata = gather_dict({k: v for k, v in batch.items() if k != "input_ids" and k != "attention_mask"})
-            t4 = time()
-            print(f'RANK {os.environ.get("RANK", "0")}: all gather time = {t4 - t3}')
 
             if self.accelerator.is_main_process:
                 all_str_samples, all_str_prompts, all_str_outputs = self.decode(
@@ -331,24 +316,15 @@ class AcceleratePPOTrainer(AccelerateRLTrainer):
                     device=device,
                 )
                 stats["time/rollout_score"] = time() - rollout_score_time
-                print(f'RANK {os.environ.get("RANK", "0")}: calc reward score time = {stats["time/rollout_score"]}')
-
                 all_scores = list(all_scores.reshape(self.accelerator.num_processes, -1).unbind())
             else:
                 all_scores = None
-            # print("dist init!!@@@@:", torch.distributed.is_initialized())
-            t5 = time()
             if torch.distributed.is_initialized():
                 scores = torch.empty(len(samples), device=device)
                 torch.distributed.scatter(scores, all_scores)
             else:
                 scores = all_scores[0].clone().detach()
-            t6 = time()
-            print(f'RANK {os.environ.get("RANK", "0")}: scatter time = {t6 - t5}')
-
             str_samples, str_prompts, str_outputs = self.decode(prompt_tensors, samples, append_eos_token=True)
-            t7 = time()
-            print(f'RANK {os.environ.get("RANK", "0")}: decode time = {t7 - t6}')
 
             # Pad the sample outputs
             outputs = self.tokenizer(str_outputs).input_ids
@@ -385,11 +361,8 @@ class AcceleratePPOTrainer(AccelerateRLTrainer):
                 scores /= self.running_moments.std
             elif self.config.method.scale_reward == "ref":
                 scores /= self.ref_std
-            t8  = time()
-            print(f'RANK {os.environ.get("RANK", "0")}: postprocess time = {t8 - t7}')
             # Precompute logprobs, values
             if self.config.model.model_arch_type == "seq2seq":
-                print("seq 2 seq")
                 attention_mask = batch.attention_mask.to(device)
                 prompt_tensors = batch.input_ids.to(device)
                 decoder_attention_mask = sample_outputs.not_equal(self.tokenizer.pad_token_id)
@@ -404,7 +377,6 @@ class AcceleratePPOTrainer(AccelerateRLTrainer):
                     logits = outputs.logits
                     values = outputs.value
                     if hasattr(self.model, "frozen_head"):
-                        print("frozen head")
                         ref_logits = self.model.forward_hydra(
                             input_ids=prompt_tensors,
                             attention_mask=attention_mask,
@@ -413,7 +385,6 @@ class AcceleratePPOTrainer(AccelerateRLTrainer):
                             return_dict=True,
                         ).logits
                     else:
-                        print("ref model")
                         ref_logits = self.ref_model(
                             input_ids=prompt_tensors,
                             attention_mask=attention_mask,
@@ -422,25 +393,21 @@ class AcceleratePPOTrainer(AccelerateRLTrainer):
                             return_dict=True,
                         ).logits
             else:
-                print("Non- seq2seq")
                 all_tokens = torch.cat((prompt_tensors.to(device), sample_outputs), dim=1)
                 attention_mask = all_tokens.not_equal(self.tokenizer.pad_token_id).long().to(device)
                 with torch.no_grad():
-                    print(f'RANK {os.environ.get("RANK", "0")}: sft: input_id shape={all_tokens.shape}, mask_shape={attention_mask.shape}')
                     logits, *_, values = self.model(
                         all_tokens,
                         attention_mask=attention_mask,
                     )
                     # TODO(dahoas): When hydra model works need to also support generation on hydra head
                     if hasattr(self.model, "frozen_head"):
-                        print("Non-seq2seq model")
                         ref_logits = self.model.forward_hydra(
                             all_tokens,
                             attention_mask=attention_mask,
                             return_dict=True,
                         ).logits
                     else:
-                        print("Non-seq2seq refmodel")
                         ref_logits = self.ref_model(
                             all_tokens,
                             attention_mask=attention_mask,
@@ -448,8 +415,6 @@ class AcceleratePPOTrainer(AccelerateRLTrainer):
                         ).logits
                         ref_logits = ref_logits.to(device)
             torch.cuda.synchronize(device)
-            t9 = time()
-            print(f'RANK {os.environ.get("RANK", "0")}: calc ref logits time = {t9 - t8}')
             if self.config.model.model_arch_type == "seq2seq":
                 logprobs = logprobs_of_labels(logits[:, :-1, :], sample_outputs[:, 1:])
                 ref_logprobs = logprobs_of_labels(ref_logits[:, :-1, :], sample_outputs[:, 1:])
@@ -512,8 +477,6 @@ class AcceleratePPOTrainer(AccelerateRLTrainer):
             stats["policy/sqrt_kl"] = torch.sqrt(mean_kl).item()
             stats["policy/kl_per_token"] = torch.sqrt(mean_kl_per_token).item()
             accumulated_stats.append(stats)
-            t10 = time()
-            print(f'RANK {os.environ.get("RANK", "0")}: finalize postprocess time = {t10 - t9}')
             tbar.set_description(f"[rollout {len(ppo_rl_elements)} / {num_rollouts}]")
             tbar.update(min(rollout_count, num_rollouts))
         tbar.close()
@@ -525,5 +488,3 @@ class AcceleratePPOTrainer(AccelerateRLTrainer):
 
         # Push samples and rewards to trainer's rollout storage
         self.push_to_store(ppo_rl_elements)
-        t_end = time()
-        print("***** ROLLout cost:", t_end - t_start, "*****")

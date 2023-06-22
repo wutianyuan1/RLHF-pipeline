@@ -22,7 +22,6 @@ class PipelinedPPOTrainer(AcceleratePPOTrainer):
     """Pipelined PPO Accelerate Trainer"""
 
     def __init__(self, config: TRLConfig, **kwargs):
-        print("Here!!")
         super().__init__(config, **kwargs)
         if self.accelerator.is_main_process:
             self.reward_proc, self.in_queue, self.out_queue = self.reward_fn
@@ -48,8 +47,6 @@ class PipelinedPPOTrainer(AcceleratePPOTrainer):
         gathered_prompt_sizes = self.accelerator.gather(prompt_sizes)
 
         if self.accelerator.is_main_process:
-            print("shape:", gathered_prompts.shape, gathered_samples.shape, gathered_prompt_sizes.shape,
-                  "device:", gathered_prompts.device, gathered_samples.device, gathered_prompt_sizes.device)
             all_str_samples, all_str_prompts, all_str_outputs = self.decode(
                 gathered_prompts, gathered_samples, gathered_prompt_sizes, append_eos_token=True
             )
@@ -58,9 +55,8 @@ class PipelinedPPOTrainer(AcceleratePPOTrainer):
                 "prompts": np.array(all_str_prompts, dtype='U5000'),
                 "original_output": np.array(all_str_outputs, dtype='U5000'),
             }
-            print("send time:", time())
             self.in_queue.put(send_data)
-        return samples
+        return samples, prompt_tensors
 
     def make_experience_postprocess(self, prompt_tensors, samples, stats, start_clock):
         assert self.config.model.model_arch_type != "seq2seq"
@@ -69,9 +65,7 @@ class PipelinedPPOTrainer(AcceleratePPOTrainer):
 
         if self.accelerator.is_main_process:
             all_scores = self.out_queue.get()
-            print("get all scores:", all_scores)
             all_scores = torch.tensor(all_scores['rewards'], dtype=torch.float, device=self.accelerator.device)
-            print("process all scores:", all_scores)
             all_scores = list(all_scores.reshape(self.accelerator.num_processes, -1).unbind())
         else:
             all_scores = None
@@ -80,6 +74,8 @@ class PipelinedPPOTrainer(AcceleratePPOTrainer):
         torch.distributed.scatter(scores, all_scores)
         
         cur_iter_ppo_rl_elements = []
+        torch.save(prompt_tensors, f'dump/pplrank{os.environ.get("RANK", "0")}_prompts.pt')
+        torch.save(samples, f'dump/pplrank{os.environ.get("RANK", "0")}_samples.pt')
         str_samples, str_prompts, str_outputs = self.decode(prompt_tensors, samples, append_eos_token=True)
         # Pad the sample outputs
         outputs = self.tokenizer(str_outputs).input_ids
@@ -220,14 +216,13 @@ class PipelinedPPOTrainer(AcceleratePPOTrainer):
         all_iter_prompts = []
         n_samples = 0
         while n_samples < num_rollouts:
-            print(n_samples, num_rollouts)
             stats = {}
             # Get next batch in prompt dataset
             batch: PromptBatch = next(self.prompt_iterator)
             ## TODO: fix device
-            samples = self.make_experience_rollout(batch, stats)
+            samples, prompt_tensors = self.make_experience_rollout(batch, stats)
 
-            all_iter_prompts.append(batch.input_ids)
+            all_iter_prompts.append(prompt_tensors)
             all_iter_stats.append(stats)
             all_iter_samples.append(samples)
             n_samples += samples.shape[0]
@@ -241,7 +236,7 @@ class PipelinedPPOTrainer(AcceleratePPOTrainer):
             prompt_tensors = all_iter_prompts[cur_iter]
             cur_iter_ppo_rl_elements, rollout_count =\
                 self.make_experience_postprocess(
-                samples, prompt_tensors, stats, clock)
+                prompt_tensors, samples, stats, clock)
 
             cur_iter += 1
             ppo_rl_elements += cur_iter_ppo_rl_elements
