@@ -83,7 +83,6 @@ class RewardProcess(multiprocessing.Process):
                 in_data = self.in_queue.get()
                 s_t = time()
                 print("recv time:", s_t, file=logfile, flush=True)
-                print("get data:", in_data, file=logfile, flush=True)
                 samples = in_data['samples']
                 prompts = in_data['prompts']
                 original_output = in_data['original_output']

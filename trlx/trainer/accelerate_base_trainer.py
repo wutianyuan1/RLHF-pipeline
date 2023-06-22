@@ -262,13 +262,9 @@ class AccelerateRLTrainer(BaseRLTrainer):
             kwargs = dict(self.generate_kwargs, **kwargs)
 
         with torch.no_grad():
-            t0 = time()
-            ret = self.accelerator.unwrap_model(self.model).generate(
+            return self.accelerator.unwrap_model(self.model).generate(
                 input_ids=input_ids, attention_mask=attention_mask, **kwargs
             )
-            t1 = time()
-            print(f'RANK {os.environ.get("RANK", "0")}: !!!!generate time {t1 - t0}')
-            return ret
 
     def generate_eval(self, input_ids, attention_mask=None, **kwargs):
         """Wraps hf's `generate` adding some specific method's defaults"""
@@ -326,8 +322,6 @@ class AccelerateRLTrainer(BaseRLTrainer):
     def evaluate(self):  # noqa: C901
         """Samples model on `eval_prompts`, logs stats with `reward_fn` or `metric_fn` if provided"""
         logger.info("Evaluating model")
-        print("!! evaluation is disabled by madoka!!")
-        return {"dummy_time": 0.0}
 
         # Do multiple evaluations over a single list in `gen_kwargs` if present
         if self.generate_sweep_kwarg is not None:
@@ -530,10 +524,8 @@ class AccelerateRLTrainer(BaseRLTrainer):
 
         # For each epoch
         # TODO: fix ppo training loop
-        print("train.epochs", self.config.train.epochs, "n_updates", self.n_updates_per_batch, "mb_size", self.mb_size, "num_mb", self.num_mb)
         for _ in range(self.config.train.epochs):
             # PPO epoch
-            t_start = time()
             for _ in range(self.n_updates_per_batch):
                 # actually the bs is the minibs in traditional ppo
                 # so always set minibs=bs
@@ -544,7 +536,6 @@ class AccelerateRLTrainer(BaseRLTrainer):
                     # https://arxiv.org/pdf/1707.06347.pdf
                     forward_time = 0
                     backward_time = 0
-                    print("len(mbs)", len(mbs))
                     stats_accum = []
                     for mb in mbs:
                         with self._accumulate():
@@ -622,8 +613,6 @@ class AccelerateRLTrainer(BaseRLTrainer):
                         return results
 
                 self.post_backward_callback()
-            t_end = time()
-            print("***** Training time cost:", t_end - t_start, "*****")
             self.post_epoch_callback()
         tbar.close()
 

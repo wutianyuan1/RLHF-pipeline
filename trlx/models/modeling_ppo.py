@@ -363,7 +363,6 @@ class AutoModelForCausalLMWithHydraValueHead(AutoModelForCausalLMWithValueHead):
         output_hidden_states: Optional[bool] = None,
         return_dict: Optional[bool] = None,
     ) -> Union[torch.FloatTensor, CausalLMOutputWithValue]:
-        t0 = time()
         forward_kwargs = self.get_compatible_forward_kwargs(
             input_ids=input_ids,
             attention_mask=attention_mask,
@@ -388,8 +387,6 @@ class AutoModelForCausalLMWithHydraValueHead(AutoModelForCausalLMWithValueHead):
         forward_kwargs.pop("input_ids", None)  # Ignore `input_ids` for branch head
         forward_kwargs.pop("inputs_embeds", None)  # Ignore `inputs_embeds` for branch head
         hydra_outputs = self.frozen_head(input_hidden_state, output_shape, **forward_kwargs)
-        t1 = time()
-        print(f'RANK {os.environ.get("RANK", "0")}: !!!!forward-hydra time {t1 - t0}')
         if not return_dict:
             return hydra_outputs.logits
         return hydra_outputs
@@ -1030,24 +1027,16 @@ class AutoModelForSeq2SeqLMWithValueHead(PreTrainedModelWrapper):
             output_hidden_states=output_hidden_states,
             return_dict=return_dict,
         )
-        t0 = time()
         forward_kwargs["output_hidden_states"] = True
         forward_kwargs["return_dict"] = True
 
         outputs = self.base_model(**forward_kwargs)
         last_hidden_state = outputs.decoder_hidden_states[-1]
         value = self.v_head(last_hidden_state).squeeze(-1)
-        t1 = time()
-        print(f'RANK {os.environ.get("RANK", "0")}: !!!!forward time {t1 - t0}')
-
         return Seq2SeqLMOutputWithValue(**outputs, value=value)
 
     def generate(self, *args, **kwargs) -> Union[ModelOutput, torch.LongTensor]:
-        t0 = time()
-        ret = self.base_model.generate(*args, **kwargs)
-        t1 = time()
-        print(f'RANK {os.environ.get("RANK", "0")}: !!!!generate time {t1 - t0}')
-        return ret
+        return self.base_model.generate(*args, **kwargs)
 
     def state_dict(self, *args, **kwargs):
         """
