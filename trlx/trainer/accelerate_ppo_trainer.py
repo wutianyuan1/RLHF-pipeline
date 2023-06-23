@@ -259,7 +259,6 @@ class AcceleratePPOTrainer(AccelerateRLTrainer):
             num_rollouts: Number of rollouts to generate
             iter_count: Total number of updates run (i.e. number of updates run for all batches & epochs)
         """
-        t_start = time()
         logger.info("Collecting rollouts")
         tbar = logging.tqdm(
             total=num_rollouts,

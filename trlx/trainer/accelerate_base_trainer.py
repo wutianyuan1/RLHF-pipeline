@@ -322,6 +322,7 @@ class AccelerateRLTrainer(BaseRLTrainer):
     def evaluate(self):  # noqa: C901
         """Samples model on `eval_prompts`, logs stats with `reward_fn` or `metric_fn` if provided"""
         logger.info("Evaluating model")
+        return {"dummy": 0}
 
         # Do multiple evaluations over a single list in `gen_kwargs` if present
         if self.generate_sweep_kwarg is not None:

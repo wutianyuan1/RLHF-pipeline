@@ -76,23 +76,16 @@ class RewardProcess(multiprocessing.Process):
         return rewards - original_rewards
     
     def run(self):
-        logfile = open('rewproc.log', 'w')
         while True:
             try:
-                print("waiting for data...", file=logfile, flush=True)
                 in_data = self.in_queue.get()
-                s_t = time()
-                print("recv time:", s_t, file=logfile, flush=True)
                 samples = in_data['samples']
                 prompts = in_data['prompts']
                 original_output = in_data['original_output']
                 rewards = self.reward_fn(samples, prompts, original_output)
-                print("reward:", rewards, rewards.shape, file=logfile, flush=True)
                 out_data = {
                     "rewards": rewards.detach().cpu().numpy(),
                 }
-                e_t = time()
-                print("reward calculation time:", e_t - s_t, file=logfile, flush=True)
                 self.out_queue.put(out_data)
             except KeyboardInterrupt:
                 break
