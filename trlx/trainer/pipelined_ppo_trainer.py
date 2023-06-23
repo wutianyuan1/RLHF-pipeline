@@ -25,7 +25,13 @@ class PipelinedPPOTrainer(AcceleratePPOTrainer):
         super().__init__(config, **kwargs)
         if self.accelerator.is_main_process:
             self.reward_proc, self.in_queue, self.out_queue = self.reward_fn
-    
+
+    def __del__(self):
+        if self.accelerator.is_main_process:
+            self.reward_proc.terminate()
+            self.in_queue.shm.close()
+            self.out_queue.shm.close()
+
     def make_experience_rollout(self, batch, stats):
         rollout_generate_time = time()
         # Generate samples from the language model (similar to using HuggingFace `generate` method)
